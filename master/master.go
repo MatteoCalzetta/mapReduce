@@ -4,48 +4,32 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"mapReduce/config"
 	"net"
 	"os"
 )
 
 func handleConnetion(conn net.Conn) {
-	/*
-		defer conn.Close()
-		//clientAddress := conn.RemoteAddr().String()
-		fmt.Println("siamo nel server e worka " + conn.RemoteAddr().String())
-
-		reader := bufio.NewReader(conn)
-
-		data, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error while retrieving data" + err.Error())
-			return
-		}
-		fmt.Println(data)
-
-		//sendResult(
-	} */
 	defer conn.Close()
 
-	// Crea un reader per leggere dalla connessione
-	var buf [4]byte // Buffer per leggere la lunghezza (int32)
+	var buf [4]byte // Buffer per leggere la lunghezza (int32), so che sono 4 byte
+
 	_, err := conn.Read(buf[:])
 	if err != nil {
 		fmt.Println("Errore durante la lettura della lunghezza:", err)
 		return
 	}
 
-	// Leggi la lunghezza dei dati
 	var length int32
-	err = binary.Read(bytes.NewReader(buf[:]), binary.LittleEndian, &length)
+	err = binary.Read(bytes.NewReader(buf[:]), binary.LittleEndian, &length) // Leggi la lunghezza dei dati
+
 	if err != nil {
 		fmt.Println("Errore durante la lettura della lunghezza:", err)
 		return
 	}
 	fmt.Println("Lunghezza dei dati ricevuti:", length)
 
-	// Leggi i dati (i numeri inviati dal client)
-	data := make([]int32, length)
+	data := make([]int32, length) // Leggi i dati (i numeri inviati dal client)
 	for i := int32(0); i < length; i++ {
 		// Leggi ogni singolo intero (4 byte)
 		err := binary.Read(conn, binary.LittleEndian, &data[i])
@@ -55,8 +39,15 @@ func handleConnetion(conn net.Conn) {
 		}
 	}
 
-	// Stampa i dati ricevuti
-	fmt.Println("Dati ricevuti dal client:", data)
+	fmt.Println("Data from client: ", data) // Stampa i dati ricevuti
+
+	workers, err := config.GetWorkers()
+	if err != nil {
+		fmt.Println("Error during workers loadup: ", err)
+	}
+
+	fmt.Println("Workers number: ", len(workers))
+
 }
 
 func main() {

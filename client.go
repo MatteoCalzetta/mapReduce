@@ -10,9 +10,6 @@ import (
 	"time"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
-
 func generateRandomInput(size, min, max int) []int {
 	rand.Seed(time.Now().UnixNano())
 	input := make([]int, size)
@@ -29,7 +26,6 @@ func main() {
 	masterAddress := "127.0.0.1:8080"
 
 	dataToProcess := generateRandomInput(size, min, max) //dati del
-	//fmt.Println(dataToProcess)
 
 	var buf bytes.Buffer //dati in bytes per comunicazione
 
