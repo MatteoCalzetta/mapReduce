@@ -103,7 +103,21 @@ func sendSliceToWorkers(workers []config.Worker, jobs [][]int32) {
 		}
 		fmt.Println("data to master has been sent", worker.Address)
 		i += 1
+
+		/*
+			// Riceve la conferma dal Worker
+			ack := make([]byte, 4) // Supponiamo che "DONE" abbia 4 byte
+			_, err = conn.Read(ack)
+			if err != nil {
+				fmt.Println("Error reading acknowledgment from worker:", err)
+				return
+			}
+
+			fmt.Printf("Acknowledgment from worker %s: %s\n", worker.Address, string(ack))
+			i++
+		*/
 	}
+
 }
 
 func main() {

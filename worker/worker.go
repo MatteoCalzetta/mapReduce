@@ -15,10 +15,10 @@ type Worker struct {
 	Address string
 }
 
-func executeJobs(conn net.Conn) {
+func receiveMapperJob(conn net.Conn) {
 	defer conn.Close()
 
-	fmt.Println("Executing jobs...")
+	fmt.Println("Received job...")
 	var buf [4]byte // Buffer per leggere la lunghezza (int32), so che sono 4 byte
 
 	_, err := conn.Read(buf[:])
@@ -46,6 +46,47 @@ func executeJobs(conn net.Conn) {
 	}
 	fmt.Println("Data from master: ", data) // Stampa i dati ricevuti
 
+	dataKeyValue := keyValueFunction(data)
+	fmt.Println("dataKeyValue", dataKeyValue)
+
+	/*
+		// Invia una conferma al Master
+		ack := "DONE"
+		_, err = conn.Write([]byte(ack))
+		if err != nil {
+			fmt.Println("Errore durante l'invio della conferma al Master:", err)
+		}
+
+		fmt.Println("Acknowledgment sent to Master.")
+	*/
+
+}
+
+func keyValueFunction(data []int32) [][]int32 {
+
+	fmt.Println("inizio a mappare")
+
+	// Mappa per contare le occorrenze
+	occurrences := make(map[int32]int32)
+
+	// Array per tenere traccia dell'ordine di apparizione delle chiavi, la funzione map esegue in modo non ordinato
+	var order []int32
+
+	// Conta le occorrenze e registra l'ordine di input
+	for _, value := range data {
+		if _, exists := occurrences[value]; !exists {
+			order = append(order, value) // Se il valore non è presente lo aggiunge
+		}
+		occurrences[value]++
+	}
+
+	// Crea il risultato come array di coppie [dato, occorrenze] con stesso ordine di input
+	var dataKeyValue [][]int32
+	for _, key := range order {
+		dataKeyValue = append(dataKeyValue, []int32{key, occurrences[key]})
+	}
+
+	return dataKeyValue
 }
 
 func main() {
@@ -87,7 +128,7 @@ func main() {
 			fmt.Println("Error accepting: ", err.Error())
 			os.Exit(1)
 		}
-		go executeJobs(conn)
+		go receiveMapperJob(conn)
 	}
 
 }
