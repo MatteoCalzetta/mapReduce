@@ -1,143 +1,106 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
-	"mapReduce/config"
+	"log"
+	"mapReduce/utils"
 	"net"
-	"os"
+	"net/rpc"
+	_ "strconv"
+	"sync"
 )
 
-func distributeJobsRoundRobin(jobs []int32, numWorkers int) [][]int32 {
-	// Crea una slice di slice per memorizzare i job per ogni worker
-	workersJobs := make([][]int32, numWorkers)
+// Struct RPC per il Master
+type Master struct{}
 
-	// Assegna ogni job al worker corrispondente in modo round-robin
-	for i, job := range jobs {
-		// Calcola a quale worker assegnare il job (round-robin)
-		workerIndex := i % numWorkers
-		// Aggiungi il job alla lista di job del worker
-		workersJobs[workerIndex] = append(workersJobs[workerIndex], job)
-	}
+// Funzione per ricevere i dati dal Client
+func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) error {
+	fmt.Println("Dati ricevuti dal Client:", args.Data)
 
-	return workersJobs
-}
+	// Calcola gli indirizzi dei Worker dinamicamente basati sugli ID passati nella linea di comando
+	workerIDs := []int{1, 2, 3, 4, 5} // ID dei Worker
+	basePort := 5000                  // Porta base per il Worker
+	workers := getDynamicWorkers(workerIDs, basePort)
 
-func handleConnetion(conn net.Conn) {
-	defer conn.Close()
-	var buf [4]byte // Buffer per leggere la lunghezza (int32), so che sono 4 byte
+	// Suddividi i dati tra i Worker
+	workerJobs := distributeJobsRoundRobin(args.Data, len(workers))
+	fmt.Println("Jobs distribuiti ai Worker:", workerJobs)
 
-	_, err := conn.Read(buf[:])
-	if err != nil {
-		fmt.Println("Errore durante la lettura della lunghezza:", err)
-		return
-	}
-
-	var length int32
-	err = binary.Read(bytes.NewReader(buf[:]), binary.LittleEndian, &length) // Leggi la lunghezza dei dati
-	if err != nil {
-		fmt.Println("Errore durante la lettura della lunghezza:", err)
-		return
-	}
-	fmt.Println("Lunghezza dei dati ricevuti:", length)
-
-	data := make([]int32, length) // Leggi i dati (i numeri inviati dal client)
-	for i := int32(0); i < length; i++ {
-		// Leggi ogni singolo intero (4 byte)
-		err := binary.Read(conn, binary.LittleEndian, &data[i])
-		if err != nil {
-			fmt.Println("Errore durante la lettura dei dati:", err)
-			return
-		}
-	}
-	fmt.Println("Data from client: ", data) // Stampa i dati ricevuti
-
-	workers, err := config.GetWorkers()
-	if err != nil {
-		fmt.Println("Error during workers loadup: ", err)
-	}
-
-	fmt.Println("Workers number: ", len(workers))
-
-	workerJobs := distributeJobsRoundRobin(data, len(workers))
-	fmt.Println(len(workerJobs[0]), len(workerJobs[1]), len(workerJobs[2]), len(workerJobs[3]), len(workerJobs[4]), "\n")
-
-	sendSliceToWorkers(workers, workerJobs)
-
-}
-
-func sendSliceToWorkers(workers []config.Worker, jobs [][]int32) {
-	i := 0
-	for _, worker := range workers {
-		var buf bytes.Buffer //dati in bytes per comunicazione
-
-		lenght := int32(len(jobs[i]))
-		err := binary.Write(&buf, binary.LittleEndian, lenght)
-		if err != nil {
-			fmt.Println("Error writing data to buffer:", err)
-			os.Exit(1)
-		}
-
-		// Scrivi i dati reali (i numeri casuali)
-		for _, val := range jobs[i] {
-			err := binary.Write(&buf, binary.LittleEndian, int32(val)) // Scrivi ogni intero come 4 byte
+	// Distribuisci i job ai Worker in parallelo
+	var wg sync.WaitGroup
+	for i, workerAddr := range workers {
+		wg.Add(1)
+		go func(i int, workerAddr string) {
+			defer wg.Done()
+			client, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
-				fmt.Println("Error writing data to buffer:", err)
-				os.Exit(1)
-			}
-		}
-
-		conn, err := net.Dial("tcp", worker.Address) //init connessione col server
-		if err != nil {
-			fmt.Println("Error connecting to worker:", err)
-			os.Exit(1)
-		}
-		fmt.Println("Connected to worker on " + conn.LocalAddr().String())
-		defer conn.Close()
-
-		_, err = conn.Write(buf.Bytes())
-		if err != nil {
-			fmt.Println("Error sending data to worker:", err)
-			os.Exit(1)
-		}
-		fmt.Println("data to master has been sent", worker.Address)
-		i += 1
-
-		/*
-			// Riceve la conferma dal Worker
-			ack := make([]byte, 4) // Supponiamo che "DONE" abbia 4 byte
-			_, err = conn.Read(ack)
-			if err != nil {
-				fmt.Println("Error reading acknowledgment from worker:", err)
+				log.Printf("Errore nella connessione al Worker %d su %s: %v", i+1, workerAddr, err)
 				return
 			}
+			defer client.Close()
 
-			fmt.Printf("Acknowledgment from worker %s: %s\n", worker.Address, string(ack))
-			i++
-		*/
+			workerArgs := utils.WorkerArgs{Job: workerJobs[i]}
+			workerReply := utils.WorkerReply{}
+			asyncCall := client.Go("Worker.ProcessJob", workerArgs, &workerReply, nil)
+			<-asyncCall.Done
+			if asyncCall.Error != nil {
+				log.Printf("Errore durante l'invocazione RPC al Worker %d: %v", i+1, asyncCall.Error)
+				return
+			}
+			fmt.Printf("Worker %d su %s ha completato il job: %v\n", i+1, workerAddr, workerReply.Ack)
+		}(i, workerAddr)
 	}
 
+	wg.Wait()
+	reply.Ack = "Dati elaborati e inviati ai Worker"
+	return nil
+}
+
+// Funzione per generare dinamicamente gli indirizzi dei Worker
+func getDynamicWorkers(ids []int, basePort int) []string {
+	workers := make([]string, len(ids))
+	for i, id := range ids {
+		workers[i] = fmt.Sprintf("127.0.0.1:%d", basePort+id)
+	}
+	return workers
+}
+
+// Funzione per suddividere i job in modalità round-robin
+func distributeJobsRoundRobin(jobs []int32, numWorkers int) [][]int32 {
+	workerJobs := make([][]int32, numWorkers)
+	for i, job := range jobs {
+		workerIndex := i % numWorkers
+		workerJobs[workerIndex] = append(workerJobs[workerIndex], job)
+	}
+	return workerJobs
 }
 
 func main() {
-	masterAddress := "127.0.0.1:8080"
+	// Crea un'istanza del Master
+	master := new(Master)
 
-	listener, err := net.Listen("tcp", masterAddress)
+	// Registra il Master come un servizio RPC
+	server := rpc.NewServer()
+	err := server.Register(master)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
-		os.Exit(1)
+		log.Fatalf("Errore durante la registrazione del Master: %v", err)
+	}
+
+	// Avvia il listener per le connessioni RPC
+	address := "127.0.0.1:8080"
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatalf("Errore durante l'ascolto del Master su %s: %v", address, err)
 	}
 	defer listener.Close()
-	fmt.Println("Listening on " + masterAddress)
 
-	for { //lasciare in ascolto server per sempre
+	fmt.Printf("Master in ascolto su %s\n", address)
+	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			os.Exit(1)
+			log.Printf("Errore durante l'accettazione della connessione: %v", err)
+			continue
 		}
-		go handleConnetion(conn)
+		go server.ServeConn(conn)
 	}
-
 }
