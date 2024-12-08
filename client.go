@@ -30,7 +30,7 @@ func generateRandomInput(size, min, max int) []int32 {
 
 func main() {
 	size := 100
-	min := 0
+	min := 1
 	max := 30
 	masterAddress := "127.0.0.1:8080"
 

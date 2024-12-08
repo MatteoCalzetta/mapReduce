@@ -76,6 +76,7 @@ func distributeJobsRoundRobin(jobs []int32, numWorkers int) [][]int32 {
 }
 
 func main() {
+
 	// Crea un'istanza del Master
 	master := new(Master)
 
