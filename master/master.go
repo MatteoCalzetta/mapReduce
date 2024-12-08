@@ -6,75 +6,67 @@ import (
 	"mapReduce/utils"
 	"net"
 	"net/rpc"
-	_ "strconv"
 	"sync"
 )
 
-// Struct RPC per il Master
 type Master struct{}
 
-// Funzione per ricevere i dati dal Client
 func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) error {
 	fmt.Println("Dati ricevuti dal Client:", args.Data)
 
-	// Configura i Worker dinamicamente
-	workerIDs := []int{1, 2, 3, 4, 5} // ID dei Worker
-	basePort := 5000                  // Porta base per i Worker
-	workers := getDynamicWorkers(workerIDs, basePort)
-
-	/*
-		// Calcola la dimensione del range di numeri per ciascun Worker
-		numWorkers := len(workers)
-		rangeSize := len(args.Data) / numWorkers
-		remaining := len(args.Data) % numWorkers
-	*/
-
-	// Assegna un range a ciascun Worker e invia le informazioni
-	workerRanges := getWorkerRanges(workerIDs, args.Data)
+	// Numero di Worker e distribuzione round-robin dei dati
+	numWorkers := 5
+	workerRanges := make(map[int][]int32)
 	var wg sync.WaitGroup
-	for i, workerAddr := range workers {
+
+	// Distribuzione round-robin dei dati tra i Worker
+	for i, value := range args.Data {
+		workerID := (i % numWorkers) + 1
+		workerRanges[workerID] = append(workerRanges[workerID], value)
+	}
+
+	// Invia i dati ai Worker
+	for workerID, data := range workerRanges {
 		wg.Add(1)
-		go func(i int, workerAddr string) {
+		go func(workerID int, data []int32) {
 			defer wg.Done()
 
-			workerID := i + 1
-			rangeToProcess := workerRanges[workerID]
-
-			// Crea l'argomento per il Worker, includendo il proprio range e gli altri range
-			workerArgs := utils.WorkerArgs{
-				Job:          createKeyValuePairs(rangeToProcess), // Funzione per creare coppie chiave-valore
-				WorkerID:     workerID,
-				WorkerRanges: workerRanges,
-			}
-
+			// Connessione al Worker
+			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
 			client, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
-				log.Printf("Errore nella connessione al Worker %d su %s: %v", workerID, workerAddr, err)
+				log.Printf("Errore nella connessione al Worker %d: %v", workerID, err)
 				return
 			}
 			defer client.Close()
 
-			workerReply := utils.WorkerReply{}
-			asyncCall := client.Go("Worker.ProcessJob", workerArgs, &workerReply, nil)
-			<-asyncCall.Done
-			if asyncCall.Error != nil {
-				log.Printf("Errore durante l'invocazione RPC al Worker %d: %v", workerID, asyncCall.Error)
+			// Crea l'argomento per il Worker
+			workerArgs := utils.WorkerArgs{
+				Job:          createKeyValuePairs(data),
+				WorkerID:     workerID,
+				WorkerRanges: workerRanges,
+			}
+			var workerReply utils.WorkerReply
+			err = client.Call("Worker.ProcessJob", &workerArgs, &workerReply)
+			if err != nil {
+				log.Printf("Errore durante l'invocazione RPC al Worker %d: %v", workerID, err)
 				return
 			}
-			fmt.Printf("Worker %d su %s ha completato la mappatura: %v\n", workerID, workerAddr, workerReply.Ack)
-		}(i, workerAddr)
+
+			fmt.Printf("Master ha inviato i dati al Worker %d: %v\n", workerID, workerReply.Ack)
+		}(workerID, data)
 	}
 
 	wg.Wait()
 
-	// Avvia la fase di riduzione: raccogli i risultati e chiedi ai Worker di ridurre i dati
-	startReducePhase(workers)
+	// Avvia la fase di riduzione
+	startReducePhase(workerRanges)
 
 	reply.Ack = "Dati elaborati e inviati ai Worker per la fase di mappatura"
 	return nil
 }
 
-// Funzione per creare le coppie chiave-valore da un range
+// Crea coppie chiave-valore da un array di dati
 func createKeyValuePairs(data []int32) map[int32]int32 {
 	result := make(map[int32]int32)
 	for _, value := range data {
@@ -83,75 +75,46 @@ func createKeyValuePairs(data []int32) map[int32]int32 {
 	return result
 }
 
-// Funzione per ottenere i range di computazione di tutti i Worker
-func getWorkerRanges(ids []int, data []int32) map[int][]int32 {
-	workerRanges := make(map[int][]int32)
-	numWorkers := len(ids)
-	rangeSize := len(data) / numWorkers
-	remaining := len(data) % numWorkers
-
-	for i, id := range ids {
-		start := i * rangeSize
-		end := start + rangeSize
-		if i == numWorkers-1 {
-			end += remaining
-		}
-		workerRanges[id] = data[start:end]
-	}
-	return workerRanges
-}
-
 // Funzione per avviare la fase di riduzione
-func startReducePhase(workers []string) {
+func startReducePhase(workerRanges map[int][]int32) {
 	var wg sync.WaitGroup
-	for _, workerAddr := range workers {
+	for workerID := range workerRanges {
 		wg.Add(1)
-		go func(workerAddr string) {
+		go func(workerID int) {
 			defer wg.Done()
+
+			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
 			client, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
-				log.Printf("Errore nella connessione al Worker per la fase di riduzione su %s: %v", workerAddr, err)
+				log.Printf("Errore nella connessione al Worker %d per la fase di riduzione: %v", workerID, err)
 				return
 			}
 			defer client.Close()
 
-			// Invia un comando di riduzione ai Worker
+			// Invio della richiesta di riduzione al Worker
 			reduceArgs := utils.ReduceArgs{}
 			reduceReply := utils.ReduceReply{}
-			asyncCall := client.Go("Worker.ReduceJob", reduceArgs, &reduceReply, nil)
-			<-asyncCall.Done
-			if asyncCall.Error != nil {
-				log.Printf("Errore durante la chiamata RPC per la riduzione al Worker su %s: %v", workerAddr, asyncCall.Error)
+			err = client.Call("Worker.ReduceJob", &reduceArgs, &reduceReply)
+			if err != nil {
+				log.Printf("Errore durante la chiamata RPC per la riduzione al Worker %d: %v", workerID, err)
 				return
 			}
-			fmt.Printf("Worker su %s ha completato la riduzione: %v\n", workerAddr, reduceReply.Ack)
-		}(workerAddr)
+
+			fmt.Printf("Worker %d ha completato la fase di riduzione: %v\n", workerID, reduceReply.Ack)
+		}(workerID)
 	}
 
 	wg.Wait()
 }
 
-// Funzione per generare dinamicamente gli indirizzi dei Worker
-func getDynamicWorkers(ids []int, basePort int) []string {
-	workers := make([]string, len(ids))
-	for i, id := range ids {
-		workers[i] = fmt.Sprintf("127.0.0.1:%d", basePort+id)
-	}
-	return workers
-}
-
 func main() {
-	// Crea un'istanza del Master
 	master := new(Master)
-
-	// Registra il Master come un servizio RPC
 	server := rpc.NewServer()
 	err := server.Register(master)
 	if err != nil {
 		log.Fatalf("Errore durante la registrazione del Master: %v", err)
 	}
 
-	// Avvia il listener per le connessioni RPC
 	address := "127.0.0.1:8080"
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
