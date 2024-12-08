@@ -17,43 +17,118 @@ type Master struct{}
 func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) error {
 	fmt.Println("Dati ricevuti dal Client:", args.Data)
 
-	// Calcola gli indirizzi dei Worker dinamicamente basati sugli ID passati nella linea di comando
+	// Configura i Worker dinamicamente
 	workerIDs := []int{1, 2, 3, 4, 5} // ID dei Worker
-	basePort := 5000                  // Porta base per il Worker
+	basePort := 5000                  // Porta base per i Worker
 	workers := getDynamicWorkers(workerIDs, basePort)
 
-	// Suddividi i dati tra i Worker
-	workerJobs := distributeJobsRoundRobin(args.Data, len(workers))
-	fmt.Println("Jobs distribuiti ai Worker:", workerJobs)
+	/*
+		// Calcola la dimensione del range di numeri per ciascun Worker
+		numWorkers := len(workers)
+		rangeSize := len(args.Data) / numWorkers
+		remaining := len(args.Data) % numWorkers
+	*/
 
-	// Distribuisci i job ai Worker in parallelo
+	// Assegna un range a ciascun Worker e invia le informazioni
+	workerRanges := getWorkerRanges(workerIDs, args.Data)
 	var wg sync.WaitGroup
 	for i, workerAddr := range workers {
 		wg.Add(1)
 		go func(i int, workerAddr string) {
 			defer wg.Done()
+
+			workerID := i + 1
+			rangeToProcess := workerRanges[workerID]
+
+			// Crea l'argomento per il Worker, includendo il proprio range e gli altri range
+			workerArgs := utils.WorkerArgs{
+				Job:          createKeyValuePairs(rangeToProcess), // Funzione per creare coppie chiave-valore
+				WorkerID:     workerID,
+				WorkerRanges: workerRanges,
+			}
+
 			client, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
-				log.Printf("Errore nella connessione al Worker %d su %s: %v", i+1, workerAddr, err)
+				log.Printf("Errore nella connessione al Worker %d su %s: %v", workerID, workerAddr, err)
 				return
 			}
 			defer client.Close()
 
-			workerArgs := utils.WorkerArgs{Job: workerJobs[i]}
 			workerReply := utils.WorkerReply{}
 			asyncCall := client.Go("Worker.ProcessJob", workerArgs, &workerReply, nil)
 			<-asyncCall.Done
 			if asyncCall.Error != nil {
-				log.Printf("Errore durante l'invocazione RPC al Worker %d: %v", i+1, asyncCall.Error)
+				log.Printf("Errore durante l'invocazione RPC al Worker %d: %v", workerID, asyncCall.Error)
 				return
 			}
-			fmt.Printf("Worker %d su %s ha completato il job: %v\n", i+1, workerAddr, workerReply.Ack)
+			fmt.Printf("Worker %d su %s ha completato la mappatura: %v\n", workerID, workerAddr, workerReply.Ack)
 		}(i, workerAddr)
 	}
 
 	wg.Wait()
-	reply.Ack = "Dati elaborati e inviati ai Worker"
+
+	// Avvia la fase di riduzione: raccogli i risultati e chiedi ai Worker di ridurre i dati
+	startReducePhase(workers)
+
+	reply.Ack = "Dati elaborati e inviati ai Worker per la fase di mappatura"
 	return nil
+}
+
+// Funzione per creare le coppie chiave-valore da un range
+func createKeyValuePairs(data []int32) map[int32]int32 {
+	result := make(map[int32]int32)
+	for _, value := range data {
+		result[value]++
+	}
+	return result
+}
+
+// Funzione per ottenere i range di computazione di tutti i Worker
+func getWorkerRanges(ids []int, data []int32) map[int][]int32 {
+	workerRanges := make(map[int][]int32)
+	numWorkers := len(ids)
+	rangeSize := len(data) / numWorkers
+	remaining := len(data) % numWorkers
+
+	for i, id := range ids {
+		start := i * rangeSize
+		end := start + rangeSize
+		if i == numWorkers-1 {
+			end += remaining
+		}
+		workerRanges[id] = data[start:end]
+	}
+	return workerRanges
+}
+
+// Funzione per avviare la fase di riduzione
+func startReducePhase(workers []string) {
+	var wg sync.WaitGroup
+	for _, workerAddr := range workers {
+		wg.Add(1)
+		go func(workerAddr string) {
+			defer wg.Done()
+			client, err := rpc.Dial("tcp", workerAddr)
+			if err != nil {
+				log.Printf("Errore nella connessione al Worker per la fase di riduzione su %s: %v", workerAddr, err)
+				return
+			}
+			defer client.Close()
+
+			// Invia un comando di riduzione ai Worker
+			reduceArgs := utils.ReduceArgs{}
+			reduceReply := utils.ReduceReply{}
+			asyncCall := client.Go("Worker.ReduceJob", reduceArgs, &reduceReply, nil)
+			<-asyncCall.Done
+			if asyncCall.Error != nil {
+				log.Printf("Errore durante la chiamata RPC per la riduzione al Worker su %s: %v", workerAddr, asyncCall.Error)
+				return
+			}
+			fmt.Printf("Worker su %s ha completato la riduzione: %v\n", workerAddr, reduceReply.Ack)
+		}(workerAddr)
+	}
+
+	wg.Wait()
 }
 
 // Funzione per generare dinamicamente gli indirizzi dei Worker
@@ -65,18 +140,7 @@ func getDynamicWorkers(ids []int, basePort int) []string {
 	return workers
 }
 
-// Funzione per suddividere i job in modalità round-robin
-func distributeJobsRoundRobin(jobs []int32, numWorkers int) [][]int32 {
-	workerJobs := make([][]int32, numWorkers)
-	for i, job := range jobs {
-		workerIndex := i % numWorkers
-		workerJobs[workerIndex] = append(workerJobs[workerIndex], job)
-	}
-	return workerJobs
-}
-
 func main() {
-
 	// Crea un'istanza del Master
 	master := new(Master)
 

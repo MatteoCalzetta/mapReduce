@@ -1,30 +1,31 @@
 package utils
 
-import "log"
-
-// Richieste dal Client al Master
-type ClientArgs struct {
-	Data []int32
-}
-
-// Risposte dal Master al Client
-type ClientReply struct {
-	Ack string
-}
-
-// Richieste dal Master ai Worker
+// Argomenti per l'RPC Master-to-Worker (fase di mappatura)
 type WorkerArgs struct {
-	Job []int32
+	Job          map[int32]int32
+	WorkerID     int
+	WorkerRanges map[int][]int32 // Mappa dei range di lavoro degli altri Worker
 }
 
-// Risposte dal Worker al Master
+// Risposta per l'RPC Master-to-Worker (fase di mappatura)
 type WorkerReply struct {
 	Ack string
 }
 
-// Funzione per controllare errori
-func CheckError(err error) {
-	if err != nil {
-		log.Fatalf("Errore: %v", err)
-	}
+// Argomenti per l'RPC Worker-to-Worker (fase di riduzione)
+type ReduceArgs struct{}
+
+// Risposta per l'RPC Worker-to-Worker (fase di riduzione)
+type ReduceReply struct {
+	Ack string
+}
+
+// Argomenti per l'RPC Client-to-Master (fase di ricezione dei dati)
+type ClientArgs struct {
+	Data []int32
+}
+
+// Risposta per l'RPC Client-to-Master (fase di ricezione dei dati)
+type ClientReply struct {
+	Ack string
 }
