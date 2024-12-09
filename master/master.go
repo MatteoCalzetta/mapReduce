@@ -11,22 +11,73 @@ import (
 
 type Master struct{}
 
+func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {
+	// Mappa per memorizzare i range dei worker
+	workerRanges := make(map[int][]int32)
+	rangeSize := totalItems / totalWorkers      // Calcola la dimensione di base del range
+	remainingItems := totalItems % totalWorkers // Calcola gli item rimanenti
+
+	start := 1 // Il primo range inizia da 1
+
+	for i := 1; i <= totalWorkers; i++ {
+		// Determina l'elemento finale per questo worker
+		end := start + rangeSize - 1
+		if i <= remainingItems {
+			end++ // I primi 'remainingItems' workers ricevono uno in più
+		}
+
+		// Se siamo all'ultimo worker, assicuriamoci che prenda tutti i valori rimanenti
+		if i == totalWorkers {
+			end = totalItems
+		}
+
+		// Crea il range per il worker
+		rangeList := make([]int32, 0, end-start+1)
+		for j := start; j <= end; j++ {
+			rangeList = append(rangeList, int32(j))
+		}
+
+		// Aggiungi il range al worker
+		workerRanges[i] = rangeList
+
+		// Prepara l'inizio del range per il prossimo worker
+		start = end + 1
+	}
+
+	return workerRanges
+}
+
+func findMax(arr []int32) int32 {
+	max := arr[0] // inizializza max con il primo elemento
+	for _, value := range arr {
+		if value > max {
+			max = value // aggiorna max se trovi un valore maggiore
+		}
+	}
+	return max
+}
+
 func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) error {
 	fmt.Println("Dati ricevuti dal Client:", args.Data)
 
-	// Numero di Worker e distribuzione round-robin dei dati
+	// Numero di Worker e distribuzione dei dati
 	numWorkers := 5
-	workerRanges := make(map[int][]int32)
-	var wg sync.WaitGroup
+	maxData := findMax(args.Data)
+	workerRanges := calculateRanges(int(maxData), numWorkers)
+	fmt.Println("Workers ranges are:", workerRanges)
 
-	// Distribuzione round-robin dei dati tra i Worker
+	// Prepara la distribuzione dei dati round-robin senza alterare workerRanges
+	var workerData = make(map[int][]int32)
+
+	// Distribuzione round-robin dei dati tra i Workers
 	for i, value := range args.Data {
 		workerID := (i % numWorkers) + 1
-		workerRanges[workerID] = append(workerRanges[workerID], value)
+		workerData[workerID] = append(workerData[workerID], value)
 	}
 
 	// Invia i dati ai Worker
-	for workerID, data := range workerRanges {
+	var wg sync.WaitGroup
+	for workerID, data := range workerData {
 		wg.Add(1)
 		go func(workerID int, data []int32) {
 			defer wg.Done()
@@ -42,10 +93,11 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 
 			// Crea l'argomento per il Worker
 			workerArgs := utils.WorkerArgs{
-				Job:          createKeyValuePairs(data),
+				Job:          createKeyValuePairs(data), // Crea le coppie chiave-valore
 				WorkerID:     workerID,
-				WorkerRanges: workerRanges,
+				WorkerRanges: workerRanges, // Passa i ranges già calcolati
 			}
+
 			var workerReply utils.WorkerReply
 			err = client.Call("Worker.ProcessJob", &workerArgs, &workerReply)
 			if err != nil {
@@ -72,6 +124,8 @@ func createKeyValuePairs(data []int32) map[int32]int32 {
 	for _, value := range data {
 		result[value]++
 	}
+
+	fmt.Println("result dentro master è ", result)
 	return result
 }
 

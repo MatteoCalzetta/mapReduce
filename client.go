@@ -23,7 +23,7 @@ func generateRandomInput(size, min, max int) []int32 {
 	rand.Seed(time.Now().UnixNano())
 	input := make([]int32, size)
 	for i := 0; i < size; i++ {
-		input[i] = int32(rand.Intn(max - min + 1))
+		input[i] = int32(rand.Intn(max-min+1) + min)
 	}
 	return input
 }

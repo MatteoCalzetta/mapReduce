@@ -20,19 +20,16 @@ type Worker struct {
 }
 
 func (w *Worker) ProcessJob(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
+
 	w.WorkerID = args.WorkerID
 	w.WorkerRanges = args.WorkerRanges
-	w.Intermediate = make(map[int32]int32)
+	w.Intermediate = args.Job
 
-	fmt.Printf("Worker %d ricevuto job: %v\n", w.WorkerID, args.Job)
-
-	// Calcola la coppia chiave-valore per il proprio range di dati
-	for key, value := range args.Job {
-		w.Intermediate[key] += value
-	}
+	fmt.Println("i range dei worker sono ", w.WorkerRanges)
+	fmt.Println("i job dek worker sono ", w.Intermediate)
 
 	reply.Ack = fmt.Sprintf("Job completato con %d valori unici", len(w.Intermediate))
-	fmt.Printf("Worker %d completato job: %v\n", w.WorkerID, w.Intermediate)
+	//fmt.Printf("Worker %d completato job: %v\n", w.WorkerID, w.Intermediate)
 	return nil
 }
 
@@ -65,8 +62,9 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 			w.mu.Lock()
 			for key, value := range w.Intermediate {
 				// Invia solo le coppie chiave-valore non nel proprio range
-				if !isInRange(key, otherRange) {
+				if !isInRange(key, w.WorkerRanges[w.WorkerID]) && isInRange(key, otherRange) {
 					tempPairs[key] += value
+					delete(w.Intermediate, key)
 				}
 			}
 			w.mu.Unlock()
