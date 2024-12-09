@@ -93,6 +93,26 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 	// Stampa i risultati finali per il Worker
 	fmt.Printf("Worker %d ha completato la fase di riduzione con i dati finali: %v\n", w.WorkerID, w.Intermediate)
 	reply.Ack = "Fase di riduzione completata"
+
+	masterAddr := "127.0.0.1:8080" // L'indirizzo del master
+	client, err := rpc.Dial("tcp", masterAddr)
+	if err != nil {
+		log.Printf("Errore nella connessione al Master: %v", err)
+		return err
+	}
+	defer client.Close()
+	workerArgs := utils.WorkerArgs{
+		Job:      w.Intermediate,
+		WorkerID: w.WorkerID,
+	}
+	var workerReply utils.WorkerReply
+	err = client.Call("Master.ReceiveDataFromWorker", &workerArgs, &workerReply)
+	if err != nil {
+		log.Printf("Errore nella connessione al Master: %v", err)
+		return err
+	}
+	fmt.Printf("Data sent correctly to master")
+
 	return nil
 }
 

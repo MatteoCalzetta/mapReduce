@@ -55,4 +55,5 @@ func main() {
 
 	// Stampa la risposta del Master
 	fmt.Println("Risposta dal Master:", reply.Ack)
+
 }

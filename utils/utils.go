@@ -33,3 +33,8 @@ type ReduceArgs struct {
 type ReduceReply struct {
 	Ack string // Messaggio di conferma della fase di riduzione completata
 }
+
+type WorkerData struct {
+	WorkerID int
+	Data     map[int32]int32
+}

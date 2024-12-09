@@ -6,10 +6,90 @@ import (
 	"mapReduce/utils"
 	"net"
 	"net/rpc"
+	"sort"
 	"sync"
 )
 
-type Master struct{}
+type Master struct {
+	CollectedData []utils.WorkerData // Slice per raccogliere i dati da ciascun worker
+	mu            sync.Mutex         // Mutex per proteggere l'accesso ai dati raccolti
+	FinalData     map[int32]int32
+}
+
+func (m *Master) ReceiveDataFromWorker(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
+	m.mu.Lock() //lock mutex to append data thread safely
+	defer m.mu.Unlock()
+
+	workerData := utils.WorkerData{
+		WorkerID: args.WorkerID,
+		Data:     args.Job,
+	}
+	m.CollectedData = append(m.CollectedData, workerData)
+	reply.Ack = "Data received from worker"
+	fmt.Println("i dati in collected data sono: ", m.CollectedData)
+	SendClientResponse(m.CollectedData)
+	return nil
+}
+
+// Ordina i dati per WorkerID
+func sortData(data []utils.WorkerData) {
+	sort.Slice(data, func(i, j int) bool {
+		return data[i].WorkerID < data[j].WorkerID
+	})
+}
+
+// Trasforma i dati da struct a un array espanso e ordinato
+func transformDataToArray(data []utils.WorkerData) []int32 {
+	var result []int32
+
+	// Itera su ciascun WorkerData
+	for _, worker := range data {
+		for key, value := range worker.Data {
+			// Aggiungi la chiave al risultato per "value" volte
+			for i := 0; i < int(value); i++ {
+				result = append(result, key)
+			}
+		}
+	}
+
+	// Ordina il risultato finale
+	sort.Slice(result, func(i, j int) bool {
+		return result[i] < result[j]
+	})
+
+	return result
+}
+
+// Invia la risposta al client
+func SendClientResponse(data []utils.WorkerData) {
+	// Ordina i dati per WorkerID
+	sortData(data)
+
+	// Trasforma i dati in un array di interi espanso e ordinato
+	finalArray := transformDataToArray(data)
+
+	// Stampa l'array risultante
+	fmt.Printf("Dati finali: %v\n", finalArray)
+
+	/*client, err := rpc.Dial("tcp", "127.0.0.1:8089")
+	if err != nil {
+		log.Fatalf("Errore durante la connessione al Master: %v", err)
+	}
+	defer client.Close()
+
+	args := &utils.ClientArgs{Data: finalArray}
+	reply := &utils.ClientReply{}
+
+	// Chiama il metodo RPC del Client
+	err = client.Call("Client.ReceiveData", args, reply)
+	if err != nil {
+		log.Fatalf("Errore durante la chiamata RPC al Master: %v", err)
+	}
+
+	// Stampa la risposta del Client
+	fmt.Println("Risposta dal Client:", reply.Ack)
+	*/
+}
 
 func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {
 	// Mappa per memorizzare i range dei worker
