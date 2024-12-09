@@ -61,6 +61,7 @@ func transformDataToArray(data []utils.WorkerData) []int32 {
 }
 
 // Invia la risposta al client
+// Invia la risposta al client
 func SendClientResponse(data []utils.WorkerData) {
 	// Ordina i dati per WorkerID
 	sortData(data)
@@ -69,26 +70,34 @@ func SendClientResponse(data []utils.WorkerData) {
 	finalArray := transformDataToArray(data)
 
 	// Stampa l'array risultante
-	fmt.Printf("Dati finali: %v\n", finalArray)
+	fmt.Printf("Dati finali da inviare al client: %v\n", finalArray)
 
-	/*client, err := rpc.Dial("tcp", "127.0.0.1:8089")
+	// Connessione al client tramite RPC
+	clientAddr := "127.0.0.1:8086" // Indirizzo del client
+	client, err := rpc.Dial("tcp", clientAddr)
 	if err != nil {
-		log.Fatalf("Errore durante la connessione al Master: %v", err)
+		log.Printf("Errore nella connessione al Client: %v", err)
+		return
 	}
 	defer client.Close()
 
-	args := &utils.ClientArgs{Data: finalArray}
-	reply := &utils.ClientReply{}
-
-	// Chiama il metodo RPC del Client
-	err = client.Call("Client.ReceiveData", args, reply)
-	if err != nil {
-		log.Fatalf("Errore durante la chiamata RPC al Master: %v", err)
+	// Prepara la risposta da inviare al client
+	clientResponse := utils.ClientResponse{
+		FinalData: finalArray,
+		Ack:       "Dati finali inviati al client con successo",
 	}
 
-	// Stampa la risposta del Client
-	fmt.Println("Risposta dal Client:", reply.Ack)
-	*/
+	// Prepara una richiesta vuota (a meno che non abbia dei parametri specifici da inviare)
+	clientRequest := utils.ClientRequest{}
+
+	// Effettua la chiamata RPC al client
+	err = client.Call("Client.ReceiveFinalData", &clientRequest, &clientResponse)
+	if err != nil {
+		log.Printf("Errore durante l'invio dei dati al Client: %v", err)
+		return
+	}
+
+	fmt.Printf("Risposta del client: %s\n", clientResponse.Ack)
 }
 
 func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {

@@ -1,15 +1,5 @@
 package utils
 
-// ClientArgs rappresenta gli argomenti inviati dal Client al Master.
-type ClientArgs struct {
-	Data []int32 // Lista di numeri ricevuti dal Client
-}
-
-// ClientReply rappresenta la risposta del Master al Client.
-type ClientReply struct {
-	Ack string // Messaggio di conferma
-}
-
 // WorkerArgs rappresenta gli argomenti inviati dai Worker al Master e viceversa.
 type WorkerArgs struct {
 	Job          map[int32]int32 // Mappa delle coppie chiave-valore per la mappatura
@@ -37,4 +27,25 @@ type ReduceReply struct {
 type WorkerData struct {
 	WorkerID int
 	Data     map[int32]int32
+}
+
+// ClientArgs rappresenta gli argomenti inviati dal Client al Master.
+type ClientArgs struct {
+	Data []int32 // Lista di numeri ricevuti dal Client
+}
+
+// ClientReply rappresenta la risposta del Master al Client.
+type ClientReply struct {
+	Ack string // Messaggio di conferma
+}
+
+// ClientResponse rappresenta la risposta che il Client restituirà al Master
+type ClientResponse struct {
+	FinalData []int32 // I dati finali inviati dal master
+	Ack       string  // Messaggio di conferma
+}
+
+// ClientRequest rappresenta una richiesta opzionale dal Master al Client.
+type ClientRequest struct {
+	Message string // Messaggio opzionale dal master
 }
