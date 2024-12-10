@@ -61,7 +61,6 @@ func transformDataToArray(data []utils.WorkerData) []int32 {
 }
 
 // Invia la risposta al client
-// Invia la risposta al client
 func SendClientResponse(data []utils.WorkerData) {
 	// Ordina i dati per WorkerID
 	sortData(data)
@@ -72,32 +71,6 @@ func SendClientResponse(data []utils.WorkerData) {
 	// Stampa l'array risultante
 	fmt.Printf("Dati finali da inviare al client: %v\n", finalArray)
 
-	// Connessione al client tramite RPC
-	clientAddr := "127.0.0.1:8086" // Indirizzo del client
-	client, err := rpc.Dial("tcp", clientAddr)
-	if err != nil {
-		log.Printf("Errore nella connessione al Client: %v", err)
-		return
-	}
-	defer client.Close()
-
-	// Prepara la risposta da inviare al client
-	clientResponse := utils.ClientResponse{
-		FinalData: finalArray,
-		Ack:       "Dati finali inviati al client con successo",
-	}
-
-	// Prepara una richiesta vuota (a meno che non abbia dei parametri specifici da inviare)
-	clientRequest := utils.ClientRequest{}
-
-	// Effettua la chiamata RPC al client
-	err = client.Call("Client.ReceiveFinalData", &clientRequest, &clientResponse)
-	if err != nil {
-		log.Printf("Errore durante l'invio dei dati al Client: %v", err)
-		return
-	}
-
-	fmt.Printf("Risposta del client: %s\n", clientResponse.Ack)
 }
 
 func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {
@@ -173,12 +146,12 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 
 			// Connessione al Worker
 			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
-			client, err := rpc.Dial("tcp", workerAddr)
+			workerConn, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
 				log.Printf("Errore nella connessione al Worker %d: %v", workerID, err)
 				return
 			}
-			defer client.Close()
+			defer workerConn.Close()
 
 			// Crea l'argomento per il Worker
 			workerArgs := utils.WorkerArgs{
@@ -188,7 +161,7 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 			}
 
 			var workerReply utils.WorkerReply
-			err = client.Call("Worker.ProcessJob", &workerArgs, &workerReply)
+			err = workerConn.Call("Worker.ProcessJob", &workerArgs, &workerReply)
 			if err != nil {
 				log.Printf("Errore durante l'invocazione RPC al Worker %d: %v", workerID, err)
 				return
@@ -203,6 +176,7 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	// Avvia la fase di riduzione
 	startReducePhase(workerRanges)
 
+	fmt.Println("aiaiai")
 	reply.Ack = "Dati elaborati e inviati ai Worker per la fase di mappatura"
 	return nil
 }

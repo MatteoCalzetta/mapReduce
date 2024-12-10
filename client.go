@@ -5,7 +5,6 @@ import (
 	"log"
 	"mapReduce/utils"
 	"math/rand"
-	"net"
 	"net/rpc"
 	"time"
 )
@@ -38,8 +37,6 @@ func main() {
 	min := 1
 	max := 30
 	masterAddress := "127.0.0.1:8080"
-	clientAddr := "127.0.0.1:8086" // Indirizzo del client
-
 	// Genera i dati casuali
 	dataToProcess := generateRandomInput(size, min, max)
 
@@ -62,52 +59,4 @@ func main() {
 	// Stampa la risposta del Master
 	fmt.Println("Risposta dal Master:", reply.Ack)
 
-	// Avvia il server RPC per il client (ascoltando sulla porta 8086)
-	clientServer := new(Client)
-	server := rpc.NewServer()
-	err = server.Register(clientServer)
-	if err != nil {
-		log.Fatalf("Errore durante la registrazione del Client: %v", err)
-	}
-
-	listener, err := net.Listen("tcp", clientAddr)
-	if err != nil {
-		log.Fatalf("Errore durante l'ascolto del Client su %s: %v", clientAddr, err)
-	}
-	defer listener.Close()
-
-	fmt.Printf("Client in ascolto su %s\n", clientAddr)
-
-	// Ora il client è in ascolto sulla porta 8086 per ricevere i dati finali
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Printf("Errore durante l'accettazione della connessione: %v", err)
-				continue
-			}
-			go server.ServeConn(conn)
-		}
-	}()
-
-	// Connessione al client per ricevere i dati finali
-	finalDataArgs := &utils.ClientRequest{}
-	finalDataReply := &utils.ClientResponse{}
-
-	// Connessione al client per ricevere i dati finali
-	client, err = rpc.Dial("tcp", clientAddr)
-	if err != nil {
-		log.Fatalf("Errore durante la connessione al client per ricevere i dati finali: %v", err)
-	}
-	defer client.Close()
-
-	// Chiama il metodo RPC del client per ricevere i dati finali dal master
-	err = client.Call("Client.ReceiveFinalData", finalDataArgs, finalDataReply)
-	if err != nil {
-		log.Fatalf("Errore durante la chiamata RPC al client per ricevere i dati finali: %v", err)
-	}
-
-	// Stampa la risposta finale del client
-	fmt.Println("Dati finali ricevuti dal Master:", finalDataReply.FinalData)
-	fmt.Println("Risposta finale dal Master:", finalDataReply.Ack)
 }
