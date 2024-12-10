@@ -58,5 +58,5 @@ func main() {
 
 	// Stampa la risposta del Master
 	fmt.Println("Risposta dal Master:", reply.Ack)
-
+	fmt.Printf("Array ordinato: ", reply.FinalData)
 }

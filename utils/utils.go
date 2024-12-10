@@ -9,8 +9,8 @@ type WorkerArgs struct {
 
 // WorkerReply rappresenta la risposta di un Worker al Master o a un altro Worker.
 type WorkerReply struct {
-	Ack string          // Messaggio di conferma
-	Job map[int32]int32 // Mappa delle coppie chiave-valore ricevute
+	Ack  string          // Messaggio di conferma
+	Data map[int32]int32 // Mappa delle coppie chiave-valore ricevute
 }
 
 // ReduceArgs rappresenta gli argomenti per la fase di riduzione dei Worker.
@@ -36,7 +36,9 @@ type ClientArgs struct {
 
 // ClientReply rappresenta la risposta del Master al Client.
 type ClientReply struct {
-	Ack string // Messaggio di conferma
+	Ack       string  // Messaggio di conferma
+	FinalData []int32 // I dati finali inviati dal master
+
 }
 
 // ClientResponse rappresenta la risposta che il Client restituirà al Master

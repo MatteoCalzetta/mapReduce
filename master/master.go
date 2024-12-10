@@ -131,20 +131,19 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	// Prepara la distribuzione dei dati round-robin senza alterare workerRanges
 	var workerData = make(map[int][]int32)
 
-	// Distribuzione round-robin dei dati tra i Workers
 	for i, value := range args.Data {
 		workerID := (i % numWorkers) + 1
 		workerData[workerID] = append(workerData[workerID], value)
 	}
 
-	// Invia i dati ai Worker
 	var wg sync.WaitGroup
+	var mu sync.Mutex // Per proteggere m.CollectedData durante le modifiche
+
 	for workerID, data := range workerData {
 		wg.Add(1)
 		go func(workerID int, data []int32) {
 			defer wg.Done()
 
-			// Connessione al Worker
 			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
 			workerConn, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
@@ -153,11 +152,10 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 			}
 			defer workerConn.Close()
 
-			// Crea l'argomento per il Worker
 			workerArgs := utils.WorkerArgs{
-				Job:          createKeyValuePairs(data), // Crea le coppie chiave-valore
+				Job:          createKeyValuePairs(data),
 				WorkerID:     workerID,
-				WorkerRanges: workerRanges, // Passa i ranges già calcolati
+				WorkerRanges: workerRanges,
 			}
 
 			var workerReply utils.WorkerReply
@@ -167,17 +165,31 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 				return
 			}
 
-			fmt.Printf("Master ha inviato i dati al Worker %d: %v\n", workerID, workerReply.Ack)
+			// Aggiorna CollectedData in modo sicuro
+			mu.Lock()
+			m.CollectedData = append(m.CollectedData, utils.WorkerData{
+				WorkerID: workerID,
+				Data:     workerReply.Data,
+			})
+			mu.Unlock()
+
+			fmt.Printf("Worker %d ha completato il lavoro: %v\n", workerID, workerReply.Ack)
 		}(workerID, data)
 	}
 
-	wg.Wait()
+	wg.Wait() // Aspetta che tutte le goroutine terminino
 
 	// Avvia la fase di riduzione
 	startReducePhase(workerRanges)
 
-	fmt.Println("aiaiai")
-	reply.Ack = "Dati elaborati e inviati ai Worker per la fase di mappatura"
+	// Risultati finali pronti per il client
+	finalArray := transformDataToArray(m.CollectedData)
+	fmt.Printf("Final array to send back to the client: %v\n", finalArray)
+
+	// Popola la risposta con i dati finali e il messaggio di ACK
+	reply.FinalData = finalArray
+	reply.Ack = "Dati elaborati con successo!"
+
 	return nil
 }
 
