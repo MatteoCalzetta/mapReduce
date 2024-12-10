@@ -6,7 +6,9 @@ import (
 	"mapReduce/utils"
 	"net"
 	"net/rpc"
+	"os"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -175,6 +177,25 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	// Popola la risposta con i dati finali e il messaggio di ACK
 	reply.FinalData = finalArray
 	reply.Ack = "Dati elaborati con successo!"
+
+	file, err := os.Create("result.txt")
+	if err != nil {
+		return fmt.Errorf("errore nella creazione del file: %v", err)
+	}
+	defer file.Close()
+
+	// Concatena i numeri della slice in una singola stringa separata da spazi
+	var stringSlice []string
+	for _, num := range finalArray {
+		stringSlice = append(stringSlice, fmt.Sprintf("%d", num))
+	}
+	line := strings.Join(stringSlice, " ") // Unisce tutti i numeri separandoli con spazi
+
+	// Scrivi la stringa concatenata nel file
+	_, err = file.WriteString(line)
+	if err != nil {
+		return fmt.Errorf("errore nella scrittura del file: %v", err)
+	}
 
 	return nil
 }
