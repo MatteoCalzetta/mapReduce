@@ -25,8 +25,7 @@ func (w *Worker) ProcessJob(args *utils.WorkerArgs, reply *utils.WorkerReply) er
 	w.WorkerRanges = args.WorkerRanges
 	w.Intermediate = args.Job
 
-	fmt.Println("i range dei worker sono ", w.WorkerRanges)
-	fmt.Println("i job dek worker sono ", w.Intermediate)
+	fmt.Println("i job del worker sono ", w.Intermediate)
 
 	reply.Ack = fmt.Sprintf("Job completato con %d valori unici", len(w.Intermediate))
 	//fmt.Printf("Worker %d completato job: %v\n", w.WorkerID, w.Intermediate)
@@ -82,7 +81,6 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 					log.Printf("Errore durante la chiamata RPC per l'invio dei dati al Worker %d: %v", otherID, err)
 					return
 				}
-				fmt.Printf("Worker %d ha inviato i dati a Worker %d: %v\n", w.WorkerID, otherID, tempPairs)
 			}
 		}(otherID, otherRange)
 	}
@@ -117,7 +115,6 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 }
 
 func (w *Worker) ReceiveData(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
-	fmt.Printf("Worker %d ha ricevuto dati per la riduzione: %v\n", w.WorkerID, args.Job)
 
 	// Aggiunge le coppie chiave-valore ricevute alla propria mappa
 	w.mu.Lock()
@@ -129,7 +126,6 @@ func (w *Worker) ReceiveData(args *utils.WorkerArgs, reply *utils.WorkerReply) e
 	}
 
 	// Stampa i dati ricevuti
-	fmt.Printf("Worker %d, dati dopo l'integrazione: %v\n", w.WorkerID, w.Intermediate)
 	reply.Ack = "Dati ricevuti e integrati"
 	return nil
 }
