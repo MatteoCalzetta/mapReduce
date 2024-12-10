@@ -16,6 +16,7 @@ type Master struct {
 	FinalData     map[int32]int32
 }
 
+// gestisco la ricezione dati dai worker, per ogni nuovo dato in arrivo viene fatto l'append su CollectedData
 func (m *Master) ReceiveDataFromWorker(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
 	m.mu.Lock() //lock mutex to append data thread safely
 	defer m.mu.Unlock()
@@ -27,18 +28,17 @@ func (m *Master) ReceiveDataFromWorker(args *utils.WorkerArgs, reply *utils.Work
 	m.CollectedData = append(m.CollectedData, workerData)
 	reply.Ack = "Data received from worker"
 	fmt.Println("i dati in collected data sono: ", m.CollectedData)
-	SendClientResponse(m.CollectedData)
 	return nil
 }
 
-// Ordina i dati per WorkerID
+// Ordina i dati per WorkerID, la mappa non ha ordine definito sebbene sia ordinata
 func sortData(data []utils.WorkerData) {
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].WorkerID < data[j].WorkerID
 	})
 }
 
-// Trasforma i dati da struct a un array espanso e ordinato
+// Trasforma i dati da struct a un array espanso e ordinato per rispedire nello stesso formato in cui il client ha inviato la richiesta
 func transformDataToArray(data []utils.WorkerData) []int32 {
 	var result []int32
 
@@ -52,25 +52,11 @@ func transformDataToArray(data []utils.WorkerData) []int32 {
 		}
 	}
 
-	// Ordina il risultato finale
 	sort.Slice(result, func(i, j int) bool {
 		return result[i] < result[j]
 	})
 
 	return result
-}
-
-// Invia la risposta al client
-func SendClientResponse(data []utils.WorkerData) {
-	// Ordina i dati per WorkerID
-	sortData(data)
-
-	// Trasforma i dati in un array di interi espanso e ordinato
-	finalArray := transformDataToArray(data)
-
-	// Stampa l'array risultante
-	fmt.Printf("Dati finali da inviare al client: %v\n", finalArray)
-
 }
 
 func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {
@@ -204,7 +190,7 @@ func createKeyValuePairs(data []int32) map[int32]int32 {
 	return result
 }
 
-// Funzione per avviare la fase di riduzione
+// Funzione per avviare la fase di riduzione, viene chiamato un worker con una go function per ogni worker.
 func startReducePhase(workerRanges map[int][]int32) {
 	var wg sync.WaitGroup
 	for workerID := range workerRanges {
@@ -212,6 +198,7 @@ func startReducePhase(workerRanges map[int][]int32) {
 		go func(workerID int) {
 			defer wg.Done()
 
+			//scelta dell'address dei worker scalabile, workerID si trova nella mappa
 			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
 			client, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
