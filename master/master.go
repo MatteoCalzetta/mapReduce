@@ -13,14 +13,14 @@ import (
 )
 
 type Master struct {
-	CollectedData []utils.WorkerData // Slice per raccogliere i dati da ciascun worker
-	mu            sync.Mutex         // Mutex per proteggere l'accesso ai dati raccolti
+	CollectedData []utils.WorkerData //Slice raccogliere i dati da ciascun worker
+	mu            sync.Mutex         //Mutex sincronizzare l'accesso ai dati raccolti
 	FinalData     map[int32]int32
 }
 
 // gestisco la ricezione dati dai worker, per ogni nuovo dato in arrivo viene fatto l'append su CollectedData
 func (m *Master) ReceiveDataFromWorker(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
-	m.mu.Lock() //lock mutex to append data thread safely
+	m.mu.Lock() //lock mutex
 	defer m.mu.Unlock()
 
 	workerData := utils.WorkerData{
@@ -29,11 +29,11 @@ func (m *Master) ReceiveDataFromWorker(args *utils.WorkerArgs, reply *utils.Work
 	}
 	m.CollectedData = append(m.CollectedData, workerData)
 	reply.Ack = "Data received from worker"
-	fmt.Println("i dati in collected data sono: ", m.CollectedData)
+	//fmt.Println("i dati in collected data sono: ", m.CollectedData)
 	return nil
 }
 
-// Ordina i dati per WorkerID, la mappa non ha ordine definito sebbene sia ordinata
+// Ordina i dati per WorkerID, la mappa non mantiene una posizione reale per gli elementi contenuti
 func sortData(data []utils.WorkerData) {
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].WorkerID < data[j].WorkerID
@@ -62,35 +62,32 @@ func transformDataToArray(data []utils.WorkerData) []int32 {
 }
 
 func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {
-	// Mappa per memorizzare i range dei worker
+	//Mappa per memorizzare i range dei worker
 	workerRanges := make(map[int][]int32)
-	rangeSize := totalItems / totalWorkers      // Calcola la dimensione di base del range
-	remainingItems := totalItems % totalWorkers // Calcola gli item rimanenti
+	rangeSize := totalItems / totalWorkers      //Calcolo dimensione base del range
+	remainingItems := totalItems % totalWorkers //Calcolo item rimanenti
 
-	start := 1 // Il primo range inizia da 1
+	start := 1
 
 	for i := 1; i <= totalWorkers; i++ {
-		// Determina l'elemento finale per questo worker
+		//Determina l'elemento finale per il worker i-esimo
 		end := start + rangeSize - 1
 		if i <= remainingItems {
-			end++ // I primi 'remainingItems' workers ricevono uno in più
+			end++ //I primi 'remainingItems' workers ricevono uno in più
 		}
 
-		// Se siamo all'ultimo worker, assicuriamoci che prenda tutti i valori rimanenti
+		//Se siamo all'ultimo worker, assicuriamoci che prenda tutti i valori rimanenti
 		if i == totalWorkers {
 			end = totalItems
 		}
 
-		// Crea il range per il worker
+		//Creo range per worker
 		rangeList := make([]int32, 0, end-start+1)
 		for j := start; j <= end; j++ {
 			rangeList = append(rangeList, int32(j))
 		}
 
-		// Aggiungi il range al worker
 		workerRanges[i] = rangeList
-
-		// Prepara l'inizio del range per il prossimo worker
 		start = end + 1
 	}
 
@@ -98,25 +95,29 @@ func calculateRanges(totalItems, totalWorkers int) map[int][]int32 {
 }
 
 func findMax(arr []int32) int32 {
-	max := arr[0] // inizializza max con il primo elemento
+	max := arr[0] //inizializzo max con primo elemento
 	for _, value := range arr {
 		if value > max {
-			max = value // aggiorna max se trovi un valore maggiore
+			max = value //aggiorno max se trovi valore maggiore
 		}
 	}
 	return max
 }
 
 func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) error {
+	fmt.Println()
 	fmt.Println("Dati ricevuti dal Client:", args.Data)
 
-	// Numero di Worker e distribuzione dei dati
+	//Numero di Worker e distribuzione dei dati
 	numWorkers := 5
 	maxData := findMax(args.Data)
 	workerRanges := calculateRanges(int(maxData), numWorkers)
-	fmt.Println("Workers ranges are:", workerRanges)
 
-	// Prepara la distribuzione dei dati round-robin senza alterare workerRanges
+	fmt.Println()
+	fmt.Println("Workers ranges are:", workerRanges)
+	fmt.Println()
+
+	//Prepara la distribuzione dei dati round-robin senza alterare workerRanges
 	var workerData = make(map[int][]int32)
 
 	for i, value := range args.Data {
@@ -125,7 +126,7 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	}
 
 	var wg sync.WaitGroup
-	var mu sync.Mutex // Per proteggere m.CollectedData durante le modifiche
+	var mu sync.Mutex //Mutex per operazione atomica su m.CollectedData durante le modifiche
 
 	for workerID, data := range workerData {
 		wg.Add(1)
@@ -141,7 +142,6 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 			defer workerConn.Close()
 
 			workerArgs := utils.WorkerArgs{
-				//Job:          createKeyValuePairs(data),
 				JobTodo:      data,
 				WorkerID:     workerID,
 				WorkerRanges: workerRanges,
@@ -154,7 +154,7 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 				return
 			}
 
-			// Aggiorna CollectedData in modo sicuro
+			//Aggiorna CollectedData in modo sicuro usando mutex
 			mu.Lock()
 			m.CollectedData = append(m.CollectedData, utils.WorkerData{
 				WorkerID: workerID,
@@ -162,20 +162,19 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 			})
 			mu.Unlock()
 
-			fmt.Printf("Worker %d ha completato il lavoro: %v\n", workerID, workerReply.Ack)
+			fmt.Printf("Worker %d ha completato la fase di mapping con: %v\n", workerID, workerReply.Ack)
 		}(workerID, data)
 	}
 
-	wg.Wait() // Aspetta che tutte le goroutine terminino
+	wg.Wait() //Aspetta che tutte le goroutine terminino
 
-	// Avvia la fase di riduzione
+	//Avvio la fase reduce
 	startReducePhase(workerRanges)
 
-	// Risultati finali pronti per il client
+	//Risultato per il client
 	finalArray := transformDataToArray(m.CollectedData)
-	fmt.Printf("Final array to send back to the client: %v\n", finalArray)
-
-	// Popola la risposta con i dati finali e il messaggio di ACK
+	fmt.Println()
+	fmt.Printf("Numeri ordinati da restituire al client: %v\n", finalArray)
 	reply.FinalData = finalArray
 	reply.Ack = "Dati elaborati con successo!"
 
@@ -185,14 +184,14 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	}
 	defer file.Close()
 
-	// Concatena i numeri della slice in una singola stringa separata da spazi
+	//Concateno numeri della slice in singola stringa separata da spazi
 	var stringSlice []string
 	for _, num := range finalArray {
 		stringSlice = append(stringSlice, fmt.Sprintf("%d", num))
 	}
 	line := strings.Join(stringSlice, " ") // Unisce tutti i numeri separandoli con spazi
 
-	// Scrivi la stringa concatenata nel file
+	//Scrivo stringa nel file
 	_, err = file.WriteString(line)
 	if err != nil {
 		return fmt.Errorf("errore nella scrittura del file: %v", err)
@@ -201,22 +200,11 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	return nil
 }
 
-/*
-// Crea coppie chiave-valore da un array di dati
-func createKeyValuePairs(data []int32) map[int32]int32 {
-	result := make(map[int32]int32)
-	for _, value := range data {
-		result[value]++
-	}
-
-	fmt.Println("result dentro master è ", result)
-	return result
-}
-
-*/
-
 // Funzione per avviare la fase di riduzione, viene chiamato un worker con una go function per ogni worker.
 func startReducePhase(workerRanges map[int][]int32) {
+	fmt.Println()
+	fmt.Println("Inizio fase di reduce")
+	fmt.Println()
 	var wg sync.WaitGroup
 	for workerID := range workerRanges {
 		wg.Add(1)
@@ -232,7 +220,6 @@ func startReducePhase(workerRanges map[int][]int32) {
 			}
 			defer client.Close()
 
-			// Invio della richiesta di riduzione al Worker
 			reduceArgs := utils.ReduceArgs{}
 			reduceReply := utils.ReduceReply{}
 			err = client.Call("Worker.ReduceJob", &reduceArgs, &reduceReply)
@@ -241,7 +228,7 @@ func startReducePhase(workerRanges map[int][]int32) {
 				return
 			}
 
-			fmt.Printf("Worker %d ha completato la fase di riduzione: %v\n", workerID, reduceReply.Ack)
+			fmt.Printf("Worker %d ha completato la fase di riduzione\n", workerID)
 		}(workerID)
 	}
 

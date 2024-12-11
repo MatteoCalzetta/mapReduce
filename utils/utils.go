@@ -3,7 +3,7 @@ package utils
 // WorkerArgs rappresenta gli argomenti inviati dai Worker al Master e viceversa.
 type WorkerArgs struct {
 	Job          map[int32]int32 // Mappa delle coppie chiave-valore per la mappatura
-	JobTodo      []int32
+	JobTodo      []int32         // Buffer per contenere il job iniziale da mappare
 	WorkerID     int             // ID del Worker
 	WorkerRanges map[int][]int32 // Mappa dei range di lavoro di tutti i Worker
 }

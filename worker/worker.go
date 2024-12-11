@@ -14,44 +14,49 @@ import (
 type Worker struct {
 	WorkerID     int
 	WorkTodo     []int32
-	WorkerRanges map[int][]int32 // Mappa dei range di lavoro di tutti i Worker
-	Intermediate map[int32]int32 // Mappa per le coppie chiave-valore intermediari
-	mu           sync.Mutex      // Mutex per sincronizzare l'accesso alla mappa Intermediate
-	wg           sync.WaitGroup  // WaitGroup per la sincronizzazione
+	WorkerRanges map[int][]int32 //Mappa dei range di lavoro di tutti i Worker
+	Intermediate map[int32]int32 //Mappa per le coppie chiave-valore intermediari
+	mu           sync.Mutex      //Mutex per sincronizzare l'accesso alla mappa Intermediate
+	wg           sync.WaitGroup  //WaitGroup per la sincronizzazione
 }
 
-// Crea coppie chiave-valore da un array di dati
+// Funz per creare coppie chiave valore
 func createKeyValuePairs(data []int32) map[int32]int32 {
 	result := make(map[int32]int32)
 	for _, value := range data {
 		result[value]++
 	}
 
-	fmt.Println("result dentro master è ", result)
+	fmt.Println("Risultato fase mapping inviata al master: ", result)
+	fmt.Println()
 	return result
 }
 
+// Funz per fase di mapping
 func (w *Worker) ProcessJob(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
 
 	w.WorkerID = args.WorkerID
 	w.WorkerRanges = args.WorkerRanges
 	w.WorkTodo = args.JobTodo
+
+	fmt.Println()
 	fmt.Println("Job da computare inviato dal master:", args.JobTodo)
+	fmt.Println()
+
 	w.Intermediate = createKeyValuePairs(args.JobTodo)
 	workerArgs := utils.WorkerArgs{}
 	workerArgs.Job = w.Intermediate
 
 	reply.Ack = fmt.Sprintf("Job completato con %d valori unici", len(w.Intermediate))
-	//fmt.Printf("Worker %d completato job: %v\n", w.WorkerID, w.Intermediate)
 	return nil
 }
 
-// Funzione per avviare la fase di riduzione e scambio di dati tra Worker
+// Funz per fase di riduzione e scambio di dati tra Worker
 func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) error {
 	fmt.Printf("Worker %d avvia la fase di riduzione\n", w.WorkerID)
 	var wg sync.WaitGroup
 
-	// Itera su tutti gli altri Worker e scambia le coppie chiave-valore non pertinenti
+	//Itero su tutti Worker e scambio coppie chiave-valore non pertinenti al range assegnato
 	for otherID, otherRange := range w.WorkerRanges {
 		if otherID == w.WorkerID {
 			continue
@@ -61,7 +66,7 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 		go func(otherID int, otherRange []int32) {
 			defer wg.Done()
 
-			// Connessione al Worker di destinazione per inviare i dati
+			//Connessione Worker di destinazione per inviare dati
 			otherWorkerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+otherID)
 			client, err := rpc.Dial("tcp", otherWorkerAddr)
 			if err != nil {
@@ -70,7 +75,7 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 			}
 			defer client.Close()
 
-			// Crea una mappa temporanea per i dati da inviare
+			//Creo mappa temporanea per i dati da inviare
 			tempPairs := make(map[int32]int32)
 			w.mu.Lock()
 			for key, value := range w.Intermediate {
@@ -82,7 +87,7 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 			}
 			w.mu.Unlock()
 
-			// Invia i dati al Worker di destinazione
+			//Invio dati worker di destinazione con range pertinente a dati trattati
 			if len(tempPairs) > 0 {
 				sendArgs := utils.WorkerArgs{
 					Job:          tempPairs,
@@ -99,14 +104,14 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 		}(otherID, otherRange)
 	}
 
-	// Aspetta che tutti i dati siano stati inviati
+	//Aspetta che tutti i dati siano stati inviati per evitare inconsistenze sui dati
 	wg.Wait()
 
-	// Stampa i risultati finali per il Worker
 	fmt.Printf("Worker %d ha completato la fase di riduzione con i dati finali: %v\n", w.WorkerID, w.Intermediate)
+	fmt.Println()
 	reply.Ack = "Fase di riduzione completata"
 
-	masterAddr := "127.0.0.1:8080" // L'indirizzo del master
+	masterAddr := "127.0.0.1:8080"
 	client, err := rpc.Dial("tcp", masterAddr)
 	if err != nil {
 		log.Printf("Errore nella connessione al Master: %v", err)
@@ -130,7 +135,7 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 
 func (w *Worker) ReceiveData(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
 
-	// Aggiunge le coppie chiave-valore ricevute alla propria mappa
+	//Aggiunge le coppie chiave-valore ricevute alla propria mappa
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for key, value := range args.Job {
@@ -139,7 +144,6 @@ func (w *Worker) ReceiveData(args *utils.WorkerArgs, reply *utils.WorkerReply) e
 		}
 	}
 
-	// Stampa i dati ricevuti
 	reply.Ack = "Dati ricevuti e integrati"
 	return nil
 }

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Funzione per generare input casuali, viene creato un array int32 e al suo interno ci sono 100 valori compresi tra 1 e 30, estremi inclusi.
+// Genero input casuali, array con 100 valori compresi tra 1 e 30
 func generateRandomInput(size, min, max int) []int32 {
 	rand.Seed(time.Now().UnixNano())
 	input := make([]int32, size)
@@ -19,15 +19,14 @@ func generateRandomInput(size, min, max int) []int32 {
 	return input
 }
 
-// Client struttura con il metodo per ricevere i dati finali dal Master
+// Struct per ricevere dati da master
 type Client struct{}
 
-// Funzione che riceve i dati finali dal master
+// Ricevo dati finali dal master
 func (c *Client) ReceiveFinalData(args *utils.ClientRequest, reply *utils.ClientResponse) error {
-	// Stampa i dati finali ricevuti dal master
+
 	fmt.Println("Dati finali ricevuti dal Master:", reply.FinalData)
 
-	// Risposta di conferma
 	reply.Ack = "Dati ricevuti correttamente dal client"
 	return nil
 }
@@ -38,10 +37,10 @@ func main() {
 	max := 30
 	masterAddress := "127.0.0.1:8080"
 
-	// Genera i dati casuali per la richiesta da inviare al master
+	//Chiamata a funz per generare numeri casuali in base ai parametri
 	dataToProcess := generateRandomInput(size, min, max)
 
-	// Connessione al Master tramite RPC
+	//Connessione al Master tramite RPC
 	client, err := rpc.Dial("tcp", masterAddress)
 	if err != nil {
 		log.Fatalf("Errore durante la connessione al Master: %v", err)
