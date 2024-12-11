@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  master:
+    build:
+      context: .  # Usa il contesto della directory radice
+      dockerfile: ./master/Dockerfile
+    container_name: master
+    ports:
+      - "8080:8080"
+    networks:
+      - app_network
+    command: ["./master"]
+
+  worker:
+    build:
+      context: .  # Usa il contesto della directory radice
+      dockerfile: ./worker/Dockerfile
+    networks:
+      - app_network
+    deploy:
+      replicas: 5
+    environment:
+      - WORKER_ID=${WORKER_ID:-1}  # Default a 1 se non definito
+    ports:
+      - "5001-5005:5001-5005"
+    command: ["./worker", "-ID=${WORKER_ID}", "-port=5000"]
+
+  client:
+    build:
+      context: .  # Usa il contesto della directory radice
+      dockerfile: ./client/Dockerfile
+    container_name: client
+    networks:
+      - app_network
+    depends_on:
+      - master
+    command: ["./client"]
+
+networks:
+  app_network:
+    driver: bridge
