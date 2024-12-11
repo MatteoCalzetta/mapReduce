@@ -75,10 +75,10 @@ Key features include:
 - **Go** installed on your system (version 1.23.4 or later recommended).
 
 ### Steps to Run
-1. Open a terminal and move in master folder with `cd mapReduce/master` and run with `go run master.go`, master open a connection by default on `127.0.0.1:8080`.
-2. Open a temrinal and move in worker folder with `cd mapReduce/worker` and run with `go run worker.go -ID=1` for the first worker that will open a connection by default on `127.0.0.1:5001`.
-3. Open a terminal and move in worker folder with `cd mapReduce/worker` and run with `go run worker.go -ID=2` for the second worker, and so on until `-ID=5` so connections by default will open from `127.0.0.1:5002` to `127.0.0.1:5005`.
-4. Open a temrinal and move in client folder with `cd mapReduce/client` and run with `go run client.go`, client connect to master on his address.
+1. Open a terminal and move in master folder with `cd mapReduce/master` and run `go run master.go`, master open a connection by default on `127.0.0.1:8080`.
+2. Open a temrinal and move in worker folder with `cd mapReduce/worker` and run `go run worker.go -ID=1` for the first worker that will open a connection by default on `127.0.0.1:5001`.
+3. Open a terminal and move in worker folder with `cd mapReduce/worker` and run `go run worker.go -ID=2` for the second worker, and so on until `-ID=5` so connections by default will open from `127.0.0.1:5002` to `127.0.0.1:5005`.
+4. Open a temrinal and move in client folder with `cd mapReduce/client` and run `go run client.go`, client connect to master on his address.
 
 
 
