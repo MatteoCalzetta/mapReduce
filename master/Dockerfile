@@ -9,11 +9,13 @@ RUN go mod download
 # Copia tutto il codice sorgente nella directory del container
 COPY . .
 
+RUN chmod +x master
+
 # Compila il file master.go
-RUN go build -v -o master master.go
+RUN go build -v -o master master/master.go
 
 # Comando per avviare il Master
-CMD ["./master"]
+CMD ["./master/master"]
 
 # Espone la porta necessaria
 EXPOSE 8080
