@@ -141,7 +141,8 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 			defer workerConn.Close()
 
 			workerArgs := utils.WorkerArgs{
-				Job:          createKeyValuePairs(data),
+				//Job:          createKeyValuePairs(data),
+				JobTodo:      data,
 				WorkerID:     workerID,
 				WorkerRanges: workerRanges,
 			}
@@ -200,6 +201,7 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 	return nil
 }
 
+/*
 // Crea coppie chiave-valore da un array di dati
 func createKeyValuePairs(data []int32) map[int32]int32 {
 	result := make(map[int32]int32)
@@ -210,6 +212,8 @@ func createKeyValuePairs(data []int32) map[int32]int32 {
 	fmt.Println("result dentro master è ", result)
 	return result
 }
+
+*/
 
 // Funzione per avviare la fase di riduzione, viene chiamato un worker con una go function per ogni worker.
 func startReducePhase(workerRanges map[int][]int32) {

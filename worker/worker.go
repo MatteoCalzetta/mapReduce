@@ -13,19 +13,33 @@ import (
 
 type Worker struct {
 	WorkerID     int
+	WorkTodo     []int32
 	WorkerRanges map[int][]int32 // Mappa dei range di lavoro di tutti i Worker
 	Intermediate map[int32]int32 // Mappa per le coppie chiave-valore intermediari
 	mu           sync.Mutex      // Mutex per sincronizzare l'accesso alla mappa Intermediate
 	wg           sync.WaitGroup  // WaitGroup per la sincronizzazione
 }
 
+// Crea coppie chiave-valore da un array di dati
+func createKeyValuePairs(data []int32) map[int32]int32 {
+	result := make(map[int32]int32)
+	for _, value := range data {
+		result[value]++
+	}
+
+	fmt.Println("result dentro master è ", result)
+	return result
+}
+
 func (w *Worker) ProcessJob(args *utils.WorkerArgs, reply *utils.WorkerReply) error {
 
 	w.WorkerID = args.WorkerID
 	w.WorkerRanges = args.WorkerRanges
-	w.Intermediate = args.Job
-
-	fmt.Println("i job del worker sono ", w.Intermediate)
+	w.WorkTodo = args.JobTodo
+	fmt.Println("Job da computare inviato dal master:", args.JobTodo)
+	w.Intermediate = createKeyValuePairs(args.JobTodo)
+	workerArgs := utils.WorkerArgs{}
+	workerArgs.Job = w.Intermediate
 
 	reply.Ack = fmt.Sprintf("Job completato con %d valori unici", len(w.Intermediate))
 	//fmt.Printf("Worker %d completato job: %v\n", w.WorkerID, w.Intermediate)
