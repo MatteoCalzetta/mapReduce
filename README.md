@@ -23,15 +23,6 @@ Key features include:
 - **Final Result**: The master collects results from workers, compiles the sorted array, and writes it to a `result.txt` file.
 
 ---
-
-## Running the program
-
-1. **Execute docker compose
-   Inside the root folder (mapReduce), execute the command `docker-compose up --build`
-
-2. **Stop workflow execution
-   Run the command `docker-compose down`
-
 ## System Architecture
 
 1. **Client**:
@@ -81,17 +72,14 @@ Key features include:
 
 ### Prerequisites
 - **Go** installed on your system (version 1.23.4 or later recommended).
+- **Docker & docker compose** installed 
 
-### Steps to Run
-1. Run the master:
-      Open a terminal and move in master folder with `cd mapReduce/master` and run `go run master.go`, master open a connection by default on `127.0.0.1:8080`.
-   
-2. Run workers:
-      Open a temrinal and move in worker folder with `cd mapReduce/worker` and run `go run worker.go -ID=workerId`, worker has `IDs from 1 to 5` and open connection by default on `127.0.0.1:5051` `:5052` `:5053` `:5054` `:5055`.
+## Running the program
 
-3. Run the client:
-      Open a temrinal and move in client folder with `cd mapReduce/client` and run `go run client.go`, client connect to master on his address.
+1. **Execute docker compose
+   Inside the root folder (mapReduce), execute the command `docker-compose up --build`
 
-
+2. **Stop workflow execution
+   Run the command `docker-compose down`
 
 
