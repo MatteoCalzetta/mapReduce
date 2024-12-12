@@ -82,4 +82,10 @@ Key features include:
 2. **Stop workflow execution**
 - Run the command `docker-compose down`
 
+## Find the result
+- The output is going to be written on `result.txt`. To access the file, follow these the steps:
+   - in your shell type `docker exec -it master /bin/sh` to access the volume for the master container,
+   - `ls` to view all the files in the volume,
+   - `cat result.txt` to print on your shell the file content.
+
 
