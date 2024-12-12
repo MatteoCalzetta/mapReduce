@@ -170,7 +170,7 @@ func main() {
 
 	value := os.Getenv("WORKER_ID")
 
-	address := fmt.Sprintf("worker-%s:%d", value, *port+*id)
+	address := fmt.Sprintf("worker-%s:%d", value, *port+*id) //docker resolves this address internally after associating worker-n to an IP, port 505n
 	fmt.Printf("Avvio Worker %d su %s\n", *id, address)
 
 	worker := new(Worker)

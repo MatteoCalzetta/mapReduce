@@ -245,7 +245,7 @@ func main() {
 
 	value := os.Getenv("MASTER_NAME")
 
-	address := fmt.Sprintf(value + ":" + "8080")
+	address := fmt.Sprintf(value + ":" + "8080") ////docker resolves this address internally after associating worker-n to an IP, port 8080
 	fmt.Println("Master address:", address)
 
 	listener, err := net.Listen("tcp", address)
