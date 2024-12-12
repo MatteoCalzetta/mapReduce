@@ -76,10 +76,10 @@ Key features include:
 
 ## Running the program
 
-1. **Execute docker compose
+1. **Execute docker compose**
    Inside the root folder (mapReduce), execute the command `docker-compose up --build`
 
-2. **Stop workflow execution
+2. **Stop workflow execution**
    Run the command `docker-compose down`
 
 
