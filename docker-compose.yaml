@@ -10,21 +10,64 @@ services:
       - "8080:8080"
     networks:
       - app_network
-    command: ["./master"]
+    environment:
+      - MASTER_NAME=master
+    command: ["./master/master"]
 
-  worker:
+  worker-1:
     build:
-      context: .  # Usa il contesto della directory radice
+      context: .
       dockerfile: ./worker/Dockerfile
+    container_name: worker-1
+    environment:
+      - WORKER_ID=1
     networks:
       - app_network
-    deploy:
-      replicas: 5
+    command: ["./worker/worker", "-ID=1"]
+
+  worker-2:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: worker-2
     environment:
-      - WORKER_ID=${WORKER_ID:-1}  # Default a 1 se non definito
-    ports:
-      - "5001-5005:5001-5005"
-    command: ["./worker", "-ID=${WORKER_ID}", "-port=5000"]
+      - WORKER_ID=2
+    networks:
+      - app_network
+    command: ["./worker/worker", "-ID=2"]
+
+  worker-3:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: worker-3
+    environment:
+      - WORKER_ID=3
+    networks:
+      - app_network
+    command: ["./worker/worker", "-ID=3"]
+
+  worker-4:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: worker-4
+    environment:
+      - WORKER_ID=4
+    networks:
+      - app_network
+    command: ["./worker/worker", "-ID=4"]
+
+  worker-5:
+    build:
+      context: .
+      dockerfile: ./worker/Dockerfile
+    container_name: worker-5
+    environment:
+      - WORKER_ID=5
+    networks:
+      - app_network
+    command: ["./worker/worker", "-ID=5"]
 
   client:
     build:
@@ -35,7 +78,7 @@ services:
       - app_network
     depends_on:
       - master
-    command: ["./client"]
+    command: ["./client/client"]
 
 networks:
   app_network:

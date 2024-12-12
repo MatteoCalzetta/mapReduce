@@ -133,7 +133,7 @@ func (m *Master) ReceiveData(args *utils.ClientArgs, reply *utils.ClientReply) e
 		go func(workerID int, data []int32) {
 			defer wg.Done()
 
-			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
+			workerAddr := fmt.Sprintf("worker-%d:%d", workerID, 5000+workerID)
 			workerConn, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
 				log.Printf("Errore nella connessione al Worker %d: %v", workerID, err)
@@ -212,7 +212,7 @@ func startReducePhase(workerRanges map[int][]int32) {
 			defer wg.Done()
 
 			//scelta dell'address dei worker scalabile, workerID si trova nella mappa
-			workerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+workerID)
+			workerAddr := fmt.Sprintf("worker-%d:%d", workerID, 5000+workerID)
 			client, err := rpc.Dial("tcp", workerAddr)
 			if err != nil {
 				log.Printf("Errore nella connessione al Worker %d per la fase di riduzione: %v", workerID, err)
@@ -243,7 +243,11 @@ func main() {
 		log.Fatalf("Errore durante la registrazione del Master: %v", err)
 	}
 
-	address := "127.0.0.1:8080"
+	value := os.Getenv("MASTER_NAME")
+
+	address := fmt.Sprintf(value + ":" + "8080")
+	fmt.Println("Master address:", address)
+
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Errore durante l'ascolto del Master su %s: %v", address, err)

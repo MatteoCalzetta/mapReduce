@@ -35,7 +35,7 @@ func main() {
 	size := 100
 	min := 1
 	max := 30
-	masterAddress := "127.0.0.1:8080"
+	masterAddress := "master:8080"
 
 	//Chiamata a funz per generare numeri casuali in base ai parametri
 	dataToProcess := generateRandomInput(size, min, max)

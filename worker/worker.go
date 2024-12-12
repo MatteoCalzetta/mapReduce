@@ -67,7 +67,7 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 			defer wg.Done()
 
 			//Connessione Worker di destinazione per inviare dati
-			otherWorkerAddr := fmt.Sprintf("127.0.0.1:%d", 5000+otherID)
+			otherWorkerAddr := fmt.Sprintf("worker-%d:%d", otherID, 5000+otherID)
 			client, err := rpc.Dial("tcp", otherWorkerAddr)
 			if err != nil {
 				log.Printf("Errore nella connessione al Worker %d: %v", otherID, err)
@@ -111,7 +111,7 @@ func (w *Worker) ReduceJob(args *utils.ReduceArgs, reply *utils.ReduceReply) err
 	fmt.Println()
 	reply.Ack = "Fase di riduzione completata"
 
-	masterAddr := "127.0.0.1:8080"
+	masterAddr := "master:8080"
 	client, err := rpc.Dial("tcp", masterAddr)
 	if err != nil {
 		log.Printf("Errore nella connessione al Master: %v", err)
@@ -168,7 +168,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	address := fmt.Sprintf("127.0.0.1:%d", *port+*id)
+	value := os.Getenv("WORKER_ID")
+
+	address := fmt.Sprintf("worker-%s:%d", value, *port+*id)
 	fmt.Printf("Avvio Worker %d su %s\n", *id, address)
 
 	worker := new(Worker)
