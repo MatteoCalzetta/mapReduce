@@ -24,7 +24,7 @@ Key features include:
 
 ---
 
-##Running the program
+## Running the program
 
 1. **Execute docker compose
    Inside the root folder (mapReduce), execute the command `docker-compose up --build`
