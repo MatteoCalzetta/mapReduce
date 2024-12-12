@@ -68,18 +68,18 @@ Key features include:
 
 ---
 
-## Installation and Usage
+### Installation and Usage
 
-### Prerequisites
+## Prerequisites
 - **Go** installed on your system (version 1.23.4 or later recommended).
 - **Docker & docker compose** installed 
 
 ## Running the program
 
-1. **Execute docker compose**
+1. **Execute docker compose**\n
    Inside the root folder (mapReduce), execute the command `docker-compose up --build`
 
-2. **Stop workflow execution**
+2. **Stop workflow execution**\n
    Run the command `docker-compose down`
 
 
